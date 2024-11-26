@@ -78,7 +78,7 @@ async function enableCam(event) {
             width: { max: 1280 },
             height: { max: 720 },
             aspectRatio: { ideal: 1.0 },
-            frameRate: { max: 15 } // フレームレートを最大15fpsに制限
+            frameRate: { ideal: 3, max: 3 }// フレームレートを最大15fpsに制限
         }
     };
 
@@ -204,9 +204,10 @@ function changedCamera() {
         video: {
             deviceId: selectCamera.value,
             facingMode: 'environment',
-            width: { max: 1920 },
-            height: { max: 1080 },
-            aspectRatio: { ideal: 1.0 }
+            width: { max: 1280 },
+            height: { max: 720 },
+            aspectRatio: { ideal: 1.0 },
+            frameRate: { ideal: 3, max: 3 }// フレームレートを最大5fpsに制限
         }
     };
 
@@ -223,6 +224,7 @@ function changedCamera() {
             console.error(err);
         });
 }
+
 
 let currentModel = './models/hanyou.tflite'; // 現在のモデル
 let gestureCounters = {}; // ジェスチャごとのカウントを記録するオブジェクト
@@ -280,3 +282,29 @@ function switchModelByGesture(gestureName) {
     }
 }
 
+// ビデオ表示を制御するフラグ
+let isVideoVisible = true;
+
+// ビデオ要素を取得
+const videoElement = document.getElementById('webcam');
+
+// ボタンのクリックイベントを設定
+document.getElementById('toggleVideoButton').addEventListener('click', () => {
+    if (isVideoVisible) {
+        // ビデオ要素のサイズを1ピクセルに設定して非表示にする
+        videoElement.style.width = '1px';
+        videoElement.style.height = '1px';
+        videoElement.style.position = 'absolute'; // 必要に応じて位置を調整
+        videoElement.style.left = '-1px'; // 画面外に配置
+        videoElement.style.top = '-1px';
+        isVideoVisible = false;
+    } else {
+        // ビデオ要素のサイズを元に戻して表示する
+        videoElement.style.width = '100%';
+        videoElement.style.height = 'auto';
+        videoElement.style.position = 'relative';
+        videoElement.style.left = '0';
+        videoElement.style.top = '0';
+        isVideoVisible = true;
+    }
+});

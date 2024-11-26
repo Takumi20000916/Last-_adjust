@@ -3,11 +3,34 @@ let version = `
 last modified: 2023/06/01 01:34:31
 `;
 
+// デバッグモードと描画間隔設定
+let DEBUG_MODE = false; // デバッグ情報を描画するかどうか
+let DRAW_INTERVAL = 1; // 描画を行うフレーム間隔
 
 // 物体検出結果およびジェスチャー結果を格納する変数
 var object_results;
 let gestures_results;
 
+// 音声読み上げ関連
+const synth = window.speechSynthesis;
+const utterance = new SpeechSynthesisUtterance();
+let isSpeaking = false; // 音声読み上げ中かどうかを示すフラグ
+let hasStarted = false; // 音声読み上げが初めてのクリック時に開始されたかどうかを示すフラグ
+let lastSpokenName = null; // 最後に読み上げた物体名
+let lastSpeakTime = 0; // 最後に読み上げた時間
+let SPEAK_INTERVAL = 1000; // 音声読み上げの間隔（ミリ秒）
+
+function speakText(text) {
+    if (!isSpeaking) {
+        utterance.text = text;
+        synth.speak(utterance);
+        isSpeaking = true;
+
+        utterance.onend = function () {
+            isSpeaking = false;
+        };
+    }
+}
 
 // P5.jsのセットアップ
 function setup() {
@@ -15,219 +38,142 @@ function setup() {
     let p5canvas = createCanvas(400, 400);
     p5canvas.parent('#canvas');
 
+    // バージョン情報をHTMLに表示
     document.querySelector('#version').innerHTML = version;
-
 
     // ジェスチャー結果を取得する関数
     gotGestures = function (results) {
         gestures_results = results;
         adjustCanvas();
-    }
+    };
 
-
-    // ものが見つかると以下の関数が呼び出される．resultsに検出結果が入っている．
+    // 物体検出結果を取得する関数
     gotDetections = function (_results) {
         object_results = _results;
-        strokeWeight(5)
+
+        // バウンディングボックスのスケール調整
         let video_width = document.querySelector('#webcam').videoWidth;
-        let video_height = document.querySelector('#webcam').videoHeight;// object_results.detections内の各物体検出に対するループ
+        let video_height = document.querySelector('#webcam').videoHeight;
 
-        // object_results.detections内の各物体検出に対するループ
         for (let d of object_results.detections) {
-            let bb = d.boundingBox;// バウンディングボックス（bb）は、現在の物体検出に関連する情報を含むオブジェクト
-            let ratio = {// ratioオブジェクトは、キャンバスサイズとウェブカメラ映像サイズとの比率を計算
+            let bb = d.boundingBox;
+            let ratio = {
                 x: width / video_width,
-                y: height / video_height
+                y: height / video_height,
             };
-            bb.originX = ratio.x * bb.originX;// バウンディングボックスのX座標をキャンバスサイズに合わせて調整
-            bb.originY = ratio.y * bb.originY;// バウンディングボックスのY座標をキャンバスサイズに合わせて調整
-            bb.width *= ratio.x;// バウンディングボックスの幅をキャンバスサイズに合わせて調整
-            bb.height *= ratio.y;// バウンディングボックスの高さをキャンバスサイズに合わせて調整
+            bb.originX = ratio.x * bb.originX;
+            bb.originY = ratio.y * bb.originY;
+            bb.width *= ratio.x;
+            bb.height *= ratio.y;
         }
+
         adjustCanvas();
-    }
-    document.querySelector('#version').innerHTML = version;// バージョン情報を表示
-
-    gotGestures = function (results) {
-        gestures_results = results;
-        handleGestures(); // ジェスチャー結果の処理を呼び出す
-    }
-}
-
-
-
-
-const synth = window.speechSynthesis;
-const utterance = new SpeechSynthesisUtterance();
-let isSpeaking = false; // 読み上げ中かどうかを示すフラグ
-
-function speakText() {
-    synth.speak(utterance);
-    isSpeaking = true; // 読み上げ中フラグを設定
-
-    utterance.onend = function (event) {
-        // 読み上げが完了したときの処理
-        isSpeaking = false; // 読み上げが完了したらフラグをリセット
     };
+
+    // 音声読み上げ開始ボタンの設定
+    document.querySelector('#speakButton').addEventListener('click', () => {
+        if (!hasStarted) {
+            speakText("音声読み上げ開始");
+            hasStarted = true;
+        }
+    });
 }
-let count = 0;
-//pointing_upの時に<button id="speakButton">音声読み上げ</button>ボタンをクリックしたことにして、テキストを読み上げる
+
+// ジェスチャー処理関数
 function handleGestures() {
     if (gestures_results) {
         for (let i = 0; i < gestures_results.gestures.length; i++) {
-            let name = gestures_results.gestures[i][0].categoryName;  // ジェスチャーのカテゴリ名 
-            if (name === "Pointing_Up" || name === "Victory" || name === "THREE" || name === "FOUR") {
-                noFill();
-                noStroke();
-                rect(0, 0, 640, 480);
-                stroke(250);
-                document.querySelector('#speakButton').click();
-                
+            let name = gestures_results.gestures[i][0].categoryName;
+            if (["Pointing_Up", "Victory", "THREE", "FOUR"].includes(name)) {
+                return true; // 指を指しているときは true を返す
             }
         }
     }
+    return false; // 指を指していないときは false を返す
 }
-//ボタンが押されたら読み上げるが、1回読み上げたらもう読み上げない
 
-document.querySelector('#speakButton').addEventListener('click', () => {
-    
-    if(!count == 1){
-        utterance.text = "音声読み上げ開始";
-        speakText();
-        count = 1;
-    }
-    for (let detection of object_results.detections) {
-        let index = detection.categories[0].index;// カテゴリのインデックスを取得
-        let bb = detection.boundingBox;// バウンディングボックス（物体の境界ボックス）情報を取得
-        let name = detection.categories[0].categoryName;// 物体のカテゴリ名を取得
-        let score = detection.categories[0].score;// 物体検出の信頼度を取得
-        let c = [240, 230, 140];// カテゴリに対応する色を取得
-        c = [...c, 250];// 色に透明度（Alpha）の値を追加して、半透明に設定
-        stroke(c);//矩形（personとか書いてあるとこ）の枠線の色を設定
-        strokeWeight(2);
-        noFill();
-        //人差し指より完全に上にある物体で一番近い物体のバウンディングボックスのみを表示
-        if (bb.originX < Pointing_x && bb.originX + bb.width > Pointing_x && bb.originY + bb.height < Pointing_y) {
-            rect(bb.originX, bb.originY, bb.width, bb.height);// バウンディングボックスを描画
-
-            fill(c);// 矩形の塗りつぶし色を設定
-            // バウンディングボックスの下に別の矩形を描画
-            rect(bb.originX, bb.originY - 20, bb.width, 20);
-            
-            //もし名前がpersonだったら、人、robotだったらロボット、banabaだったらバナナと表示
-            if (name === "14-green_tea") {
-                name = "緑茶";
-            } else if (name === "17-jasmine_tea") {
-                name = "ジャスミン茶";
-            } else if (name === "18-barley_tea") {
-                name = "麦茶";
-            }else if (name === "29-cider") {
-                name = "麦茶";
-            } else if (name === "35-peach") {
-                name = "ピーチ";
-            }else if (name === "25-unsweetened_coffee") {
-                name = "ブラックコーヒー";
-            } else if (name === "13-water") {
-                name = "水";
-            }else if (name === "31-sports") {
-                name = "スポーツドリンク";
-            }
-
-            else if (name === "4-cold") {
-                name = "冷たい";
-            } else if (name === "5-hot") {
-                name = "あたたかい";
-            } 
-
-            //ドリンク種類のカテゴリ名を日本語に変換
-            else if (name === "6-tea") {
-                name = "お茶";
-            }else if (name === "7-black_tea") {
-                name = "紅茶";
-            } else if (name === "8-coffee") {
-                name = "コーヒー";
-            }else if (name === "9-juice") {
-                name = "ジュース";
-            } else if (name === "10-carbonated") {
-                name = "炭酸";
-            }else if (name === "11-dessert") {
-                name = "デザート";
-            }
-            else if (name === "12-food") {
-                name = "食べ物";
-            }
-
-            //容器情報のカテゴリ名を日本語に変換
-            else if (name === "1-pet") {
-                name = "ペットボトル";
-            } else if (name === "2-can") {
-                name = "缶";
-            }else if (name === "3-bottle") {
-                name = "瓶";
-            }
-            
-            //情報の表示
-            noStroke();
-            fill(255);
-            textSize(20);
-            textAlign(LEFT, CENTER);
-            text(`${name} - ${score.toFixed(2)} `, bb.originX + 10, bb.originY - 10);// カテゴリ名と信頼度を描画
-            if(!isSpeaking){
-                utterance.text = name + "です";
-                speakText();
-            }
-            index++;
-        }
-        
-    }
-});
-
+// 人差し指の座標
 let Pointing_x;
 let Pointing_y;
+
+// 描画関数
 function draw() {
-
     clear();
-    // console.log(count);
-    if (gestures_results) {      
-        // もしジェスチャーの結果が存在する場合、以下の処理を実行
-        if (gestures_results.landmarks) {
 
-                   
-            for (const landmarks of gestures_results.landmarks) {
-                noStroke();  // 線を描かない
-                fill(100, 150, 210);  // 円の塗りつぶし色を指定
-                Pointing_x = gestures_results.landmarks[0][8].x * width;
-                Pointing_y = gestures_results.landmarks[0][8].y * height;
-                circle(Pointing_x, Pointing_y, 10);  // 特徴点の位置に円を描画
+    // フレームスキップの設定
+    if (frameCount % DRAW_INTERVAL !== 0) {
+        return;
+    }
+
+    // ジェスチャーの描画
+    let pointing = false; // 指を指しているかのフラグ
+    if (gestures_results && gestures_results.landmarks) {
+        for (const landmarks of gestures_results.landmarks) {
+            noStroke();
+            fill(100, 150, 210);
+            Pointing_x = gestures_results.landmarks[0][8].x * width;
+            Pointing_y = gestures_results.landmarks[0][8].y * height;
+            circle(Pointing_x, Pointing_y, 10); // 人差し指位置
+        }
+        pointing = handleGestures(); // 指を指しているかの状態を取得
+    }
+
+    // 物体検出結果の描画と読み上げ
+    if (pointing && object_results && object_results.detections) {
+        strokeWeight(2);
+
+        for (let detection of object_results.detections) {
+            let bb = detection.boundingBox;
+            let name = detection.categories[0].categoryName;
+            let score = detection.categories[0].score;
+
+            // 人差し指より上にある物体のみを描画
+            if (bb.originX < Pointing_x && bb.originX + bb.width > Pointing_x && bb.originY + bb.height < Pointing_y) {
+                stroke(250, 230, 140);
+                noFill();
+                rect(bb.originX, bb.originY, bb.width, bb.height);
+
+                noStroke();
+                fill(255);
+                textSize(15);
+                textAlign(LEFT, CENTER);
+                text(`${name} (${score.toFixed(2)})`, bb.originX + 5, bb.originY - 10);
+
+                // 一定間隔で名前を読み上げる
+                let currentTime = millis();
+                if (name === lastSpokenName) {
+                    if (currentTime - lastSpeakTime > SPEAK_INTERVAL) {
+                        speakText(name + "です");
+                        lastSpeakTime = currentTime;
+                    }
+                } else {
+                    speakText(name + "です");
+                    lastSpokenName = name;
+                    lastSpeakTime = currentTime;
+                }
+
+                break;
             }
         }
-    
-        // ジェスチャーの結果を表示する Pointing_Upは3番目
-        for (let i = 0; i < gestures_results.gestures.length; i++) {
-            // 各検出されたジェスチャーの情報を処理
-            noStroke();  // 線を描かない
-            fill(255, 0, 0);  // 文字の色を指定
-            textSize(20);  // テキストのサイズを指定
-    
-            // ジェスチャーの情報を変数に格納
-            let name = gestures_results.gestures[i][0].categoryName;  // ジェスチャーのカテゴリ名
+    } else {
+        lastSpokenName = null; // 指を指していない場合はリセット
+    }
 
-            textSize(30);  // 大きなテキストサイズを指定
-            fill(0);  // 文字の色を指定
-            text(name, 100,100);
-        }   
-        handleGestures();
-        //console.log("うんこぶりぶり");
+    // デバッグモードの描画
+    if (DEBUG_MODE && gestures_results && gestures_results.gestures) {
+        for (let i = 0; i < gestures_results.gestures.length; i++) {
+            let name = gestures_results.gestures[i][0].categoryName;
+            fill(255, 0, 0);
+            textSize(20);
+            text(name, 10, 30 + i * 30);
+        }
     }
 }
 
-
-// キャンバスのサイズを調整する関数
+// キャンバスのサイズ調整関数
 function adjustCanvas() {
-    // ウェブカメラの映像サイズに合わせてキャンバスのサイズを調整
     var element_webcam = document.getElementById('webcam');
     resizeCanvas(element_webcam.clientWidth, element_webcam.clientHeight);
-    //console.log(element_webcam.clientWidth);
 }
 
 // カメラの再生/停止を切り替える関数
@@ -239,4 +185,3 @@ function toggleCameraPlay() {
         element_video.pause();
     }
 }
-
