@@ -107,6 +107,8 @@ function draw() {
 
     // ジェスチャーの描画
     let pointing = false; // 指を指しているかのフラグ
+    let detectedGestureName = null; // 検出されたジェスチャー名
+
     if (gestures_results && gestures_results.landmarks) {
         for (const landmarks of gestures_results.landmarks) {
             noStroke();
@@ -116,6 +118,11 @@ function draw() {
             circle(Pointing_x, Pointing_y, 10); // 人差し指位置
         }
         pointing = handleGestures(); // 指を指しているかの状態を取得
+
+        // 検出されたジェスチャー名を取得
+        if (gestures_results.gestures && gestures_results.gestures.length > 0) {
+            detectedGestureName = gestures_results.gestures[0][0].categoryName;
+        }
     }
 
     // 物体検出結果の描画と読み上げ
@@ -158,6 +165,16 @@ function draw() {
     } else {
         lastSpokenName = null; // 指を指していない場合はリセット
     }
+
+    // **ここから追加**
+    // 検出されたジェスチャー名を画面中央に描画
+    if (detectedGestureName) {
+        fill(255); // 白色
+        textSize(32);
+        textAlign(CENTER, CENTER);
+        text(detectedGestureName, width / 2, height / 2);
+    }
+    // **ここまで追加**
 
     // デバッグモードの描画
     if (DEBUG_MODE && gestures_results && gestures_results.gestures) {

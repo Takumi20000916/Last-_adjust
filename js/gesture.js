@@ -16,12 +16,16 @@ const createGestureRecognizer = async () => {
     gestureRecognizer = await GestureRecognizer.createFromOptions(vision, {
         baseOptions: {
             modelAssetPath:
-                "https://raw.githubusercontent.com/Takumi20000916/PVTF_URL/a2e2a46a24d9abe67a5bd4bd13a2925e30239d6a/PVTF.task",
+                "https://raw.githubusercontent.com/Takumi20000916/PVTF2_URL/f1429dfe17a6a912024fd0a82d6d4103e736251c/PVTF2.task",
             delegate: "GPU"
         },
         runningMode: runningMode,
         numHands: 2
     });
+
+    //https://raw.githubusercontent.com/Takumi20000916/PVTF_URL/a2e2a46a24d9abe67a5bd4bd13a2925e30239d6a/PVTF.task
+    //https://github.com/Takumi20000916/PVTF2_URL/raw/f1429dfe17a6a912024fd0a82d6d4103e736251c/PVTF2.task
+    
     //document.getElementById("message").innerHTML += "done";
 
     // ジェスチャー認識モデルが読み込まれた後に自動的にカメラを有効にする
